@@ -1,12 +1,38 @@
+#
+#  Copyright (c) 2016-2021 Sequana Dev Team (https://sequana.readthedocs.io)
+#
+#  The full license is in the LICENSE file, distributed with this software.
+#
+#  Website:       https://github.com/sequana/sequana
+#  Documentation: http://sequana.readthedocs.io
+#  Contributors:  https://github.com/sequana/sequana/graphs/contributors
+##############################################################################
+# standard modules
+import glob
+import os
+import shutil
+import subprocess
+
 import sequana
-from sequana import snaketools as sm
-from sequana import sequana_data
+from sequana_pipetools import snaketools as sm
 
-sm.init("laa", globals())
+# for development when testing sequana-wrappers. DO NOT change
+sequana_wrapper_branch = "main"
 
-# This must be defined before the include
+
+
+# ========================================================= The main config file
+#
 configfile: "config.yaml"
-__snakefile__ = os.path.abspath(__snakefile__) + ".rules"
+
+
+# ================================================== The sequana pipeline manager
+#
+manager = sm.PipelineManagerGeneric("laa", config)
+manager.setup(globals(), mode="warning")
+config = manager.config
+
+#__snakefile__ = os.path.abspath(__snakefile__) + ".rules"
 
 
 # TEST to performed
@@ -15,20 +41,20 @@ __snakefile__ = os.path.abspath(__snakefile__) + ".rules"
 # set do_vcf_filter on/off
 
 
-exec(open(sequana.modules["dynamic_copy"], "r").read())
 
 
 M = sm.PipelineManagerGeneric("laa", config)
 
 # set reference alias
-reference = config["input"]["reference_file"]
+reference = config["reference_file"]
 
 if len(M.ff) == 0:
     logger.error("No files found.")
     sys.exit(0)
 
 # CHECK the input type
-assert config['input']['data_type_choice'] in ['lima.ccs.fastq', 'lima.ccs.bam', 'subreads.bam']
+#assert config['input']['data_type_choice'] in ['lima.ccs.fastq', 'lima.ccs.bam', 'subreads.bam']
+
 
 # Check the reference validity
 assert reference.endswith('.fa') or reference.endswith('.fasta'), \
@@ -44,6 +70,7 @@ do_freebayes_vcf_filter =  config["freebayes_vcf_filter"]["do"]
 
 
 
+"""
 smrtlink_file = config['input']['smrtlink_report_file']
 if smrtlink_file:
     if os.path.exists(smrtlink_file) is False:
@@ -51,13 +78,13 @@ if smrtlink_file:
     do_smrtlink_report = True
 else:
     do_smrtlink_report = False
-
+"""
 
 
 
 # identify the pattern
 
-data_type = config['input']['data_type_choice']
+data_type = config['data_type_choice']
 
 ccs2fastq = False
 
@@ -89,7 +116,7 @@ M.samples = {tag:fl for tag, fl in zip(samples, M.ff.realpaths)}
 expected_output = [
     expand("{sample}/images/coverage.png", sample=samples),
     "images/plot_ccs_histo.png",
-    "rulegraph/rulegraph.svg",
+    ".sequana/rulegraph.svg",
     "multiqc_report.html",
     expand("{sample}/remapping/mapping.sorted.bam",sample=samples),
     "outputs/mapping_consensus/mapping.sorted.bam",
@@ -116,18 +143,14 @@ if do_snpeff:
 
     __copy_genbank__input = config['snpeff']['reference_file']
     __copy_genbank__output = "reference/" + os.path.basename(__copy_genbank__input)
-    include: dynamic_copy("genbank", M)
+    rule copy_genbank:
+        input: __copy_genbank__input
+        output: __copy_genbank__output
+        shell:
+            """cp {input} {output}"""
     expected_output.append(__copy_genbank__output)
 
 
-
-if do_smrtlink_report:
-    expected_output.append("images/barcoding_subreads_histogram.png")
-
-    __copy_smrtlink__input = smrtlink_file
-    __copy_smrtlink__output = "inputs/" + os.path.basename(__copy_smrtlink__input)
-    include: dynamic_copy("smrtlink", M)
-    expected_output.append(__copy_smrtlink__output)
 
 
 # MUST BE ONE OF THE FIRST RULE ?
@@ -158,9 +181,6 @@ if laa is True:
             cd {params.directory}
             laa --noPhasing --minLength 1000 -v --maxReads 2400  --numThreads={threads} {input}
             """
-
-# PROJET 812
-BAMPATH = "/pasteur/projets/policy01/Biomics/PacBio/smrtlink/userdata/jobs_root/001/001336/tasks/barcoding.tasks.lima-0/"
 
 
 bam2ccs = False
@@ -214,15 +234,21 @@ rule fastq_stats:
 
 if do_snpeff:
     __snpeff_add_locus_in_fasta__log = "common_logs/snpeff_add_locus_in_fasta.log"
-    __snpeff_add_locus_in_fasta__input = reference
+    __snpeff_add_locus_in_fasta__input_fasta = reference
+    __snpeff_add_locus_in_fasta__input_annotation = config["snpeff"]["reference_file"]
     __snpeff_add_locus_in_fasta__output = "reference/{0}".format(os.path.basename(reference))
     include: sm.modules["snpeff_add_locus_in_fasta"]
     reference = __snpeff_add_locus_in_fasta__output
 else:
     # copy reference into ./reference
-    __copy_reference__input = config['input']['reference_file']
+    __copy_reference__input = config['reference_file']
     __copy_reference__output = "reference/" + os.path.basename(__copy_reference__input)
-    include: dynamic_copy("reference", M)
+
+    rule copy_reference:
+        input: __copy_reference__input
+        output: __copy_reference__output
+        shell:
+            """cp {input} {output}"""
     expected_output.append(__copy_reference__output)
     reference = __copy_reference__output
 
@@ -369,8 +395,20 @@ include: sm.modules['rulegraph']
 """
 
 
-__rulegraph__output="rulegraph/rulegraph.svg"
+
 rule rulegraph:
+    input: str(manager.snakefile)
+    output:
+        svg = ".sequana/rulegraph.svg"
+    params:
+        mapper = {"multiqc": "../multiqc/multiqc_report.html"},
+        configname = "config.yaml"
+    wrapper:
+        "main/wrappers/rulegraph"
+
+
+__rulegraph__output=".sequanah/rulegraph.svg"
+"""rule rulegraph:
     input: __snakefile__.replace("rulegraph/", "")
     output:
         svg = __rulegraph__output,
@@ -394,7 +432,7 @@ rule rulegraph:
             #"plot_ccs_histo": "images/plot_ccs_histo.png"
         })
         shell("dot -Tsvg {} -o {}".format(output.dot2, output.svg))
-
+"""
 
 if do_snpeff:
     __multiqc__input = (
@@ -408,6 +446,7 @@ else:
         expand("{sample}/mapping/sequana_bamtools_stats_{sample}.txt", sample=samples),
         expand("{sample}/sequana_laa_{sample}.json", sample=samples))
 
+from sequana import sequana_data
 rule multiqc:
     input:
         __multiqc__input
@@ -758,6 +797,8 @@ rule plot_ccs_histo:
         savefig(output[0], dpi=150)
 
 
+# TOFIX
+do_smrtlink_report = False
 if do_smrtlink_report:
     rule barcoding:
         input: __copy_smrtlink__output
@@ -797,9 +838,9 @@ if do_smrtlink_report:
 
 
 if do_snpeff:
-    localrules: conda, smrtlink, genbank, reference, itol
+    localrules: conda, copy_genbank, copy_reference, itol
 else:
-    localrules: conda, smrtlink, reference, itol
+    localrules: conda, copy_reference, itol
 
 
 onsuccess:

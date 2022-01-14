@@ -1,12 +1,14 @@
-
 #input_pattern: "data/lima*.fastq"
 #input_pattern: "databam/*bam"
 #input_directory: "."
 
-input_directory: ''
-input_pattern: "*fastq" 
-reference_file: 
+input_directory: /home/cokelaer/Work/github/sequana_pipelines/sequana_laa/sequana_pipelines/laa/data
+input_pattern: '*fastq.gz'
+reference_file: 'AB038249.fa'
 
+
+# do not change:
+data_type_choice: "lima.ccs.fastq"   
 
 #
 #
@@ -34,18 +36,19 @@ reference_file:
 freebayes:
     do: true
     ploidy: 2
-    options: ' --min-alternate-fraction 0.01 --legacy-gls '
+    options: --min-alternate-fraction 0.01 --legacy-gls
     split_multiallelic: true
 
 
 snpeff:
-    do: true
+    do: false
     reference_file: AB038249.gbk
     options: -no-downstream -no-upstream
+
 kraken:
     do: false
     databases:
-        - /home/cokelaer/.config/sequana/viruses_only/
+        -
 
 
 
