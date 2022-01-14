@@ -71,6 +71,7 @@ setup(
     long_description = open("README.rst").read(),
     keywords         = metainfo['keywords'],
     description      = metainfo['description'],
+    long_description_content_type = "text/x-rst",
     license          = metainfo['license'],
     platforms        = metainfo['platforms'],
     url              = metainfo['url'],
