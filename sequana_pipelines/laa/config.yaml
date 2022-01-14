@@ -1,0 +1,70 @@
+
+#input_pattern: "data/lima*.fastq"
+#input_pattern: "databam/*bam"
+#input_directory: "."
+
+input_directory: ''
+input_pattern: "*fastq" 
+reference_file: 
+
+
+#
+#
+# data_type_choice__ = ["lima.ccs.fastq", "lima.ccs.bam", "subreads.bam"]
+#input:
+#    data_type_choice: lima.ccs.fastq
+
+
+
+# for populations, and ploidy of 1, a population SNP found in a population
+# will have a score of 0. Here setting to 2 is a trick. Alternative is
+# to set freebayes scores to 0
+# Useful options: 
+# --min-alternate-count set to 0.01 (default is 0.05) allows detection of SNPs
+# with frequency as low as 1% but this may lead to False positive. Useful for
+# hypervariable virus population.
+# -- legacy-gls could be use if SNPs have zero score whereas they look good
+# --noindels clean up the final VCF with only SNPs but not recommended by
+# freebayes
+#
+# With new freebayes if min alternate is low, some SNPs 
+# bcftools norm performs left-align and normalize indels; check if REF alleles match the reference;
+# split multiallelic sites into multiple rows; recover multiallelics from multiple rows.
+#
+freebayes:
+    do: true
+    ploidy: 2
+    options: ' --min-alternate-fraction 0.01 --legacy-gls '
+    split_multiallelic: true
+
+
+snpeff:
+    do: true
+    reference_file: AB038249.gbk
+    options: -no-downstream -no-upstream
+kraken:
+    do: false
+    databases:
+        - /home/cokelaer/.config/sequana/viruses_only/
+
+
+
+
+freebayes_vcf_filter:
+    do: true
+    freebayes_score: 0
+    frequency: 0.0
+    min_depth: 10
+    forward_depth: 3
+    reverse_depth: 3
+    strand_ratio: 0.2
+raxml_mltree:
+    N: 100
+    options: ''
+
+
+raxml_bootstrap:
+    N: 100
+    options: ''
+
+

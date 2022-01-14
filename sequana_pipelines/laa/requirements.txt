@@ -1,0 +1,7 @@
+
+kraken2
+snpeff
+igvtools
+freebayes
+bamtools
+vt
