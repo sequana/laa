@@ -14,12 +14,17 @@
 
 This is is the **laa** pipeline from the `Sequana <https://sequana.readthedocs.org>`_ project
 
-:Overview: T
+:Overview: Perform amplicon analysis on Pacbio data sets including variant and phylogeny
 :Input: A set of CCS files from pacbio in FastQ formats
 :Output: variant calling, phylogney, consensus genomes, etc
 :Status: production but may change
 :Citation: Cokelaer et al, (2017), ‘Sequana’: a Set of Snakemake NGS pipelines, Journal of Open Source Software, 2(16), 352, JOSS DOI doi:10.21105/joss.00352
 
+This pipeline was used in :
+
+- L'Honneur et al (polyomavirus, 2022) https://pubmed.ncbi.nlm.nih.gov/34979561/ 
+- Kali et al (rabies,2021), https://pubmed.ncbi.nlm.nih.gov/33444703/
+- Claireaux et al. (gene involved in HIV, 2022) accepted, not yet on pubmed
 
 Installation
 ~~~~~~~~~~~~
