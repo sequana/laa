@@ -1,7 +1,7 @@
-
-kraken2
-snpeff
-igvtools
-freebayes
-bamtools
-vt
+- kraken2
+- snpeff
+- igvtools
+- freebayes
+- bamtools
+- vt
+- mafft

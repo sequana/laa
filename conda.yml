@@ -5,3 +5,6 @@ samtools
 bamtools
 snpeff
 kraken2
+mafft
+raxml
+minimap2
