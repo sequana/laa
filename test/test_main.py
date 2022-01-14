@@ -18,6 +18,6 @@ def test_standalone_script(tmpdir):
 
 
 def test_version():
-    cmd = ["sequana_laa, --version"]
+    cmd = ["sequana_laa"," --version"]
     subprocess.call(cmd)
 
