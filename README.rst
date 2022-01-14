@@ -14,10 +14,10 @@
 
 This is is the **laa** pipeline from the `Sequana <https://sequana.readthedocs.org>`_ project
 
-:Overview: TODO 
-:Input: TODO
-:Output: TODO
-:Status: draft
+:Overview: T
+:Input: A set of CCS files from pacbio in FastQ formats
+:Output: variant calling, phylogney, consensus genomes, etc
+:Status: production but may change
 :Citation: Cokelaer et al, (2017), ‘Sequana’: a Set of Snakemake NGS pipelines, Journal of Open Source Software, 2(16), 352, JOSS DOI doi:10.21105/joss.00352
 
 
@@ -38,8 +38,8 @@ Usage
 
 ::
 
-    sequana_pipelines_laa --help
-    sequana_pipelines_laa --input-directory DATAPATH 
+    sequana_laa --help
+    sequana_laa --input-directory DATAPATH 
 
 This creates a directory with the pipeline and configuration file. You will then need 
 to execute the pipeline::
@@ -50,7 +50,7 @@ to execute the pipeline::
 This launch a snakemake pipeline. If you are familiar with snakemake, you can 
 retrieve the pipeline itself and its configuration files and then execute the pipeline yourself with specific parameters::
 
-    snakemake -s laa.rules -c config.yaml --cores 4 --stats stats.txt
+    snakemake -s laa.rules -c config.yaml --cores 4 --stats stats.txt --wrapper-prefix git+file:///home/cokelaer/Work/github/forked/sequana-wrappers
 
 Or use `sequanix <https://sequana.readthedocs.io/en/master/sequanix.html>`_ interface.
 
@@ -59,16 +59,22 @@ Requirements
 
 This pipelines requires the following executable(s):
 
-- TODO
+- vt
+- freebayes
+- igvtools
+- sequana
+- snpeff (optional)
+- samtools
+- bamtools
+- minimap2
 
-.. image:: https://raw.githubusercontent.com/sequana/sequana_laa/master/sequana_pipelines/laa/dag.png
+.. image:: https://raw.githubusercontent.com/sequana/laa/main/sequana_pipelines/laa/dag.png
 
 
 Details
 ~~~~~~~~~
 
-This pipeline runs **laa** in parallel on the input fastq files (paired or not). 
-A brief sequana summary report is also produced.
+This pipeline runs amplicon analysis on long reads data from pacbio sequencers. 
 
 
 Rules and configuration details
@@ -83,7 +89,7 @@ Changelog
 ========= ====================================================================
 Version   Description
 ========= ====================================================================
-0.0.1     **First release.**
+0.8.0     **First release.**
 ========= ====================================================================
 
 
