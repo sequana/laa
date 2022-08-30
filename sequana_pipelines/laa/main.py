@@ -51,7 +51,7 @@ class Options(argparse.ArgumentParser):
 
         pipeline_group = self.add_argument_group("pipeline")
 
-        pipeline_group.add_argument("--TODO", dest="TODO", default=4, type=int)
+        pipeline_group.add_argument("--reference-file", dest="reference", required=True, type=str)
 
     def parse_args(self, *args):
         args_list = list(*args)
@@ -96,6 +96,8 @@ def main(args=None):
         cfg.input_directory = os.path.abspath(options.input_directory)
         cfg.input_pattern = options.input_pattern
         manager.exists(cfg.input_directory)
+
+        cfg.reference_file = os.path.abspath(options.reference)
 
     # finalise the command and save it; copy the snakemake. update the config
     # file and save it.

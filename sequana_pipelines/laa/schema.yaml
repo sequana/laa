@@ -1,14 +1,97 @@
-# Schema validator for the quality_control
+# Schema validator for the laa pipeline
 # author: Thomas Cokelaer
+
 
 type: map
 mapping:
     "input_directory":
         type: str
         required: False
-    "input_readtag":
-        type: str
-        required: False
     "input_pattern":
         type: str
         required: False
+    "reference_file":
+        type: str
+        required: True
+    "data_type_choice":
+        type: str
+        required: True
+    "freebayes":
+        type: map
+        mapping:
+            "do":
+                type: bool
+                required: True
+            "ploidy":
+                type: int
+                required: True
+            "options":
+                type: str
+                required: False
+            "split_multiallelic":
+                type: bool
+                required: True
+    "snpeff":
+        type: map
+        mapping:
+            "do":
+                type: bool
+                required: True
+            "reference_file":
+                type: str
+                required: True
+            "options":
+                type: str
+                required: True
+    "kraken":
+        type: map
+        mapping:
+            "do":
+                type: bool
+                required: True
+            "databases":
+                type: any
+                required: False
+    "freebayes_vcf_filter":
+        type: map
+        mapping:
+            "do":
+                type: bool
+                required: True
+            "freebayes_score":
+                type: float
+                required: True
+            "frequency":
+                type: float
+                required: True
+            "min_depth":
+                type: int
+                required: True
+            "forward_depth":
+                type: int
+                required: True
+            "reverse_depth":
+                type: int
+                required: True
+            "strand_ratio":
+                type: float
+                required: True
+    "raxml_mltree":
+        type: map
+        mapping:
+            "N":
+                type: int
+                required: True
+            "options":
+                type: str
+                required: True
+    "raxml_bootstrap":
+        type: map
+        mapping:
+            "N":
+                type: int
+                required: True
+            "options":
+                type: str
+                required: True
+
