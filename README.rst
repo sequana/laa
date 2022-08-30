@@ -56,7 +56,7 @@ retrieve the pipeline itself and its configuration files and then execute the pi
 
     snakemake -s laa.rules -c config.yaml --cores 4 --stats stats.txt --wrapper-prefix git+file:///home/cokelaer/Work/github/forked/sequana-wrappers
 
-Or use `sequanix <https://sequana.readthedocs.io/en/master/sequanix.html>`_ interface.
+Or use `sequanix <https://sequana.readthedocs.io/en/main/sequanix.html>`_ interface.
 
 Requirements
 ~~~~~~~~~~~~
@@ -84,7 +84,7 @@ This pipeline runs amplicon analysis on long reads data from pacbio sequencers.
 Rules and configuration details
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Here is the `latest documented configuration file <https://raw.githubusercontent.com/sequana/sequana_laa/master/sequana_pipelines/laa/config.yaml>`_
+Here is the `latest documented configuration file <https://raw.githubusercontent.com/sequana/laa/main/sequana_pipelines/laa/config.yaml>`_
 to be used with the pipeline. Each rule used in the pipeline may have a section in the configuration file. 
 
 Changelog
@@ -93,6 +93,7 @@ Changelog
 ========= ====================================================================
 Version   Description
 ========= ====================================================================
+0.9.0     add singularity containers
 0.8.0     **First release.**
 ========= ====================================================================
 

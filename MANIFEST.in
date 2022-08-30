@@ -5,4 +5,3 @@ include requirements*txt
 include README.rst
 prune test
 prune doc
-prune sequana_pipelines/laa/data

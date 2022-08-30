@@ -1,0 +1,20 @@
+name: laa
+
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+
+dependencies:
+  - freebayes
+  - bwa
+  - snpeff==5.0
+  - samtools
+  - bamtools
+  - mafft
+  - igvtools
+  - pip
+  - pip:
+    - sequana
+
+
