@@ -16,6 +16,11 @@ mapping:
     "data_type_choice":
         type: str
         required: True
+    "extra_prefixes_to_strip":
+        type: any
+        required: False
+    "apptainers":
+        type: any
     "freebayes":
         type: map
         mapping:
@@ -37,7 +42,7 @@ mapping:
             "do":
                 type: bool
                 required: True
-            "reference_file":
+            "annotation_file":
                 type: str
                 required: True
             "options":
@@ -94,4 +99,19 @@ mapping:
             "options":
                 type: str
                 required: True
-
+    "multiqc":
+        type: map
+        mapping:
+            "options":
+                type: str
+            "modules":
+                type: str
+            "config_file":
+                type: str
+            "input_directory":
+                type: str
+    "itol":
+        type: map
+        mapping:
+            "do":
+                type: bool
