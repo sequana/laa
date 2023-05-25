@@ -1,4 +1,4 @@
-name: laa
+name: sequana_variant_calling
 
 channels:
   - conda-forge
@@ -6,13 +6,15 @@ channels:
   - defaults
 
 dependencies:
-  - freebayes
+  - freebayes>1
   - bwa
-  - snpeff==5.0
-  - samtools
+  - 'snpeff==5.1d'
+  - sambamba
+  - samtools>=1.15
   - bamtools
-  - mafft
   - igvtools
+  - vt
+  - bcftools
   - pip
   - pip:
     - sequana

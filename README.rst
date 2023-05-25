@@ -93,6 +93,7 @@ Changelog
 ========= ====================================================================
 Version   Description
 ========= ====================================================================
+0.10.0    full integration with latest wrapeprs and apptainers from damona
 0.9.0     add singularity containers
 0.8.0     **First release.**
 ========= ====================================================================

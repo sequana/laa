@@ -37,10 +37,6 @@ if len(manager.ff) == 0:
     logger.error("No files found.")
     sys.exit(0)
 
-# CHECK the input type
-#assert config['input']['data_type_choice'] in ['lima.ccs.fastq', 'lima.ccs.bam', 'subreads.bam']
-
-
 # Check the reference validity
 assert reference.endswith('.fa') or reference.endswith('.fasta'), \
     "Reference must be a FASTA file ending in .fa or .fasta"
@@ -72,7 +68,7 @@ expected_output = [
     expand("{sample}/images/coverage.png", sample=manager.samples),
     "images/plot_ccs_histo.png",
     ".sequana/rulegraph.svg",
-    "multiqc_report.html",
+    "multiqc/multiqc_report.html",
     expand("{sample}/remapping/mapping.sorted.bam",sample=manager.samples),
     "outputs/mapping_consensus/mapping.sorted.bam",
     "outputs/raxml/RAxML_bipartitions.T3333",
@@ -106,13 +102,9 @@ if do_snpeff:
     expected_output.append(__copy_genbank__output)
 
 
-
-
 # MUST BE ONE OF THE FIRST RULE ?
 rule pipeline:
     input:  expected_output
-
-
 
 
 __rawdata__input = manager.getrawdata()
@@ -142,7 +134,9 @@ if bam2ccs:
         output: "bc{sample}/lima_output.lbc{sample}--lbc{sample}.ccs.bam"
         params:
             directory="bc{sample}"
-        threads: 8
+        threads: 4
+        container:
+            config['apptainers']['ccs']
         shell:
             """
             #mkdir -p {params.directory}
@@ -154,20 +148,20 @@ if bam2ccs:
 # __mapping__input is made of a set of FASTQ
 
 if ccs2fastq:
-    __ccs2fastq__input = __rawdata__input
-    __ccs2fastq__output = "fastq/{sample}/data.fastq"
     rule ccs2fastq:
-        input:  __ccs2fastq__input   # "bc{sample}/lima_output.lbc{sample}--lbc{sample}.ccs.bam"
-        output: __ccs2fastq__output # "bc{sample}/lima_output.lbc{sample}--lbc{sample}.ccs.fastq"
+        input: manager.getrawdata()
+        output: "fastq/{sample}/data.fastq"
+        container:
+            config['apptainers']['sequana_tools']
         shell:
             """
-            bioconvert bam2fastq {input} {output} --force
+            samtools fastq {input} > {output}
             """
-    __mapping__input = __ccs2fastq__output
-    __sequana_kraken__input = __ccs2fastq__output
+    __mapping__input = "fastq/{sample}/data.fastq"
+    __sequana_kraken__input = "fastq/{sample}/data.fastq"
 else:
-    __mapping__input = __rawdata__input
-    __sequana_kraken__input = __rawdata__input
+    __mapping__input = manager.getrawdata()
+    __sequana_kraken__input = manager.getrawdata()
 
 
 rule fastq_stats:
@@ -185,12 +179,25 @@ rule fastq_stats:
 
 
 if do_snpeff:
-    __snpeff_add_locus_in_fasta__log = "common_logs/snpeff_add_locus_in_fasta.log"
     __snpeff_add_locus_in_fasta__input_fasta = reference
-    __snpeff_add_locus_in_fasta__input_annotation = config["snpeff"]["reference_file"]
-    __snpeff_add_locus_in_fasta__output = "reference/{0}".format(os.path.basename(reference))
-    include: sm.modules["snpeff_add_locus_in_fasta"]
-    reference = __snpeff_add_locus_in_fasta__output
+    new_reference = "reference/{0}".format(os.path.basename(reference))
+
+    rule snpeff_add_locus_in_fasta:
+        input:
+            config["reference_file"],
+            config["snpeff"]["annotation_file"]
+        output:
+            new_reference
+        params:
+            options=config["snpeff"]["build_options"]
+        log:
+            "common_logs/snpeff_add_locus_in_fasta.log"
+        container:
+            config['apptainers']['sequana_tools']
+        wrapper:
+            f"{sequana_wrapper_branch}/wrappers/snpeff_add_locus_in_fasta"
+
+    reference = new_reference
 else:
     # copy reference into ./reference
     __copy_reference__input = config['reference_file']
@@ -207,8 +214,8 @@ else:
 
 
 rule mapping:
-    # input data is fastq files. 
-    # If input is fastq, we can use the __rawdata__input variable that is
+    # input data is fastq files.
+    # If input is fastq, we can use the manager.rawdata variable that is
     # a dictionary with {sample} wildcards, otherwise a simple wildcard, which
     # is the output of ccs2fastq rule
     input:
@@ -222,14 +229,14 @@ rule mapping:
         reference = reference
     log:
         "{sample}/mapping/mapping.log"
-    threads: 
+    threads:
         4
     container:
-        "https://zenodo.org/record/7031863/files/sequana_tools_0.14.2.img"
+        config['apptainers']['sequana_tools']
     shell:
         """
         minimap2 -x map-pb {input.reference} {input.fastq} -t {threads} -a 1> {output.sam} 2>{log}
-        samtools view -bh {output.sam} > {output.bam} 
+        samtools view -bh {output.sam} > {output.bam}
         bamtools sort -in {output.bam} -out {output.sorted_bam}
         """
 
@@ -238,7 +245,7 @@ rule samtools_stats:
     input: "{sample}/mapping/mapping.sorted.bam"
     output: "{sample}/mapping/samtools_{sample}.txt"
     container:
-        "https://zenodo.org/record/7031863/files/sequana_tools_0.14.2.img"
+        config['apptainers']['sequana_tools']
     shell:
         "samtools stats -in {input} > {output}"
 
@@ -247,7 +254,7 @@ rule bamtools_stats:
     input: "{sample}/mapping/mapping.sorted.bam"
     output: "{sample}/mapping/sequana_bamtools_stats_{sample}.txt"
     container:
-        "https://zenodo.org/record/7031863/files/sequana_tools_0.14.2.img"
+        config['apptainers']['sequana_tools']
     shell:
         "bamtools stats -in {input} > {output}"
 
@@ -255,31 +262,43 @@ rule bamtools_stats:
 rule mapping_index:
         input: "{sample}/mapping/mapping.sorted.bam"
         output: "{sample}/mapping/mapping.sorted.bam.bai"
-        threads: 
+        threads:
             1
         container:
-            "https://zenodo.org/record/7031863/files/sequana_tools_0.14.2.img"
-        shell: 
+            config['apptainers']['sequana_tools']
+        shell:
             "bamtools index -in {input}"
 
 
 if do_freebayes:
-    __freebayes__input = "{sample}/mapping/mapping.sorted.bam"
-    __freebayes__reference = reference
     __freebayes__output = "{sample}/freebayes/variants.raw.vcf"
-    __freebayes__log = "{sample}/freebayes/freebayes.log"
-    include: sm.modules["freebayes"]
+
+    rule freebayes:
+        input:
+            bam ="{sample}/mapping/mapping.sorted.bam",
+            ref= reference
+        output:
+            __freebayes__output
+        log:
+            "{sample}/freebayes/{sample}_freebayes.log"
+        params:
+            ploidy=config["freebayes"]["ploidy"],
+            options=config["freebayes"]["options"]
+        container:
+            config['apptainers']['sequana_tools']
+        wrapper:
+            f"{sequana_wrapper_branch}/wrappers/freebayes"
 
 if do_split_multiallelic:
 
-    __split_multiallelic__output = "{sample}/freebayes/variants.raw.split.vcf" 
+    __split_multiallelic__output = "{sample}/freebayes/variants.raw.split.vcf"
     rule split_multiallelic:
-        input: 
-            __freebayes__output
-        output: 
+        input:
+            "{sample}/freebayes/variants.raw.vcf"
+        output:
             "{sample}/freebayes/variants.raw.split.vcf"
         container:
-            "https://zenodo.org/record/7031863/files/sequana_tools_0.14.2.img"
+            config['apptainers']['sequana_tools']
         shell:
             """
             bcftools norm -m -both {input} | vt decompose_blocksub - > {output}
@@ -289,27 +308,56 @@ if do_split_multiallelic:
 
 
 if do_freebayes and do_snpeff:
-    __snpeff__input = __freebayes__output
-    __snpeff__output = "{sample}/snpeff/variants.ann.vcf"
-    __snpeff__html =   "{sample}/snpeff/snpeff.html"
-    __snpeff__log =    "{sample}/snpeff/snpeff.log"
+    #__snpeff__output = "{sample}/snpeff/variants.ann.vcf"
+    #__snpeff__html =   "{sample}/snpeff/snpeff.html"
+    #__snpeff__log =    "{sample}/snpeff/snpeff.log"
     # HERE is it important to include the sample in snpeff.csv file so that
     # multiqc can differentiate the files from each other.
-    __snpeff__csv =    "{sample}/snpeff/{sample}.snpeff.csv"
-    include: sm.modules["snpeff"]
-    __freebayes_vcf_filter__input = __snpeff__output
+    #__snpeff__csv =    "{sample}/snpeff/{sample}.snpeff.csv"
+
+    rule snpeff:
+        input:
+            #vcf = "{sample}/freebayes/{sample}.raw.vcf",
+            vcf = __freebayes__output,
+            ann = annotation_file
+        output:
+            html="{sample}/snpeff/{sample}.snpeff.html",
+            csv="{sample}/snpeff/{sample}.snpeff.csv",
+            vcf="{sample}/snpeff/{sample}.ann.vcf"
+        log:
+            "{sample}/snpeff/{sample}_snpeff.log"
+        params:
+            options=config["snpeff"]["options"]
+        container:
+            config['apptainers']['sequana_tools']
+        wrapper:
+            f"{sequana_wrapper_branch}/wrappers/snpeff"
+
+    __freebayes_vcf_filter__input = "{sample}/snpeff/{sample}.ann.vcf"
 elif do_freebayes:
     __freebayes_vcf_filter__input = __freebayes__output
 
 
-
 if do_freebayes and do_freebayes_vcf_filter:
     # __freebayes_vcf_filter__input defined above in the do_snpeff switch
-    __freebayes_vcf_filter__output = "{sample}/freebayes/variants.filtered.vcf"
-    __freebayes_vcf_filter__csv = "{sample}/freebayes/variants.filtered.csv"
-    __freebayes_vcf_filter__report_dir = "{sample}/report_variant"
-    __freebayes_vcf_filter__html =  "{sample}/report_variant/variant_calling.html"
-    include: sm.modules["freebayes_vcf_filter"]
+    #__freebayes_vcf_filter__output = "{sample}/freebayes/variants.filtered.vcf"
+    #__freebayes_vcf_filter__csv = "{sample}/freebayes/variants.filtered.csv"
+    #__freebayes_vcf_filter__report_dir = "{sample}/report_variant"
+    #__freebayes_vcf_filter__html =  "{sample}/report_variant/variant_calling.html"
+
+    rule freebayes_vcf_filter:
+        input:
+            __freebayes_vcf_filter__input
+        output:
+            vcf="{sample}/freebayes_vcf_filter/{sample}.filter.vcf",
+            csv="{sample}/freebayes_vcf_filter/{sample}.filter.csv",
+            html="{sample}/report_variant/variant_calling.html"
+        params:
+            filter_dict=config["freebayes_vcf_filter"]
+        container:
+            config['apptainers']['sequana_tools']
+        wrapper:
+            f"{sequana_wrapper_branch}/wrappers/freebayes_vcf_filter"
 
 
 rule igv_bases:
@@ -317,35 +365,39 @@ rule igv_bases:
     # samtools mpileup -R -B -f ../../reference/CCR5_whole_locus.fasta
     # mapping.sorted.bam > out
     #
-    input: "{sample}/mapping/mapping.sorted.bam.bai"
-    output: "{sample}/igvtools/bases.txt"
+    input:
+        bam="{sample}/mapping/mapping.sorted.bam",
+        bai="{sample}/mapping/mapping.sorted.bam.bai"
+    output:
+        "{sample}/igvtools/bases.txt"
     params:
         reference = reference
-    log: 
+    log:
         "{sample}/igvtools/coverage.log"
-    #container:
-    #    "https://zenodo.org/record/7031863/files/sequana_tools_0.14.2.img"
-    run:
-        input = input[0].replace(".bai", "")
-        cmd = "igvtools count {input} stdout {params.reference} -w 1 --bases 1> {output} 2>{log}"
-        shell(cmd)
+    container:
+        config['apptainers']['sequana_tools']
+    shell:
+        """
+        igvtools count {input.bam} stdout {params.reference} -w 1 --bases 1> {output} 2>{log}
+        """
 
 
 rule igv_count:
-    input: 
-        "{sample}/mapping/mapping.sorted.bam.bai"
-    output: 
+    input:
+        bam="{sample}/mapping/mapping.sorted.bam",
+        bai="{sample}/mapping/mapping.sorted.bam.bai"
+    output:
         "{sample}/igvtools/coverage.txt"
     params:
         reference = reference
-    log: 
+    log:
         "{sample}/igvtools/coverage.log"
-    #container:
-    #    "https://zenodo.org/record/7022635/files/igvtools_2.12.0.img"
-    run:
-        input = input[0].replace(".bai", "")
-        cmd = "igvtools count {input} stdout {params.reference} -w 1 > {output} 2>{log}"
-        shell(cmd)
+    container:
+        config['apptainers']['sequana_tools']
+    shell:
+        """
+        igvtools count {input.bam} stdout {params.reference} -w 1 > {output} 2>{log}
+        """
 
 
 rule coverage:
@@ -364,16 +416,28 @@ rule coverage:
         savefig(output[0], dpi=150)
 
 
-
+# ========================================================== rulegraph
 rule rulegraph:
     input: str(manager.snakefile)
     output:
-        svg = ".sequana/rulegraph.svg"
+        svg = "rulegraph/rulegraph.dot"
     params:
         mapper = {"multiqc": "../multiqc/multiqc_report.html"},
         configname = "config.yaml"
     wrapper:
-        "main/wrappers/rulegraph"
+        f"{sequana_wrapper_branch}/wrappers/rulegraph"
+
+
+rule dot2svg:
+    input:
+        "rulegraph/rulegraph.dot"
+    output:
+        ".sequana/rulegraph.svg"
+    container:
+        config['apptainers']['graphviz']
+    shell:
+        """dot -Tsvg {input} -o {output}"""
+
 
 
 
@@ -390,28 +454,26 @@ else:
         expand("{sample}/sequana_laa_{sample}.json", sample=manager.samples))
 
 
-from sequana import sequana_data
+modules = config['multiqc']['modules']
+if do_kraken:
+    modules += " sequana_kraken "
+if do_snpeff:
+    modules += " snpeff "
+
 rule multiqc:
     input:
         __multiqc__input
-    output: "multiqc_report.html"
+    output:
+       "multiqc/multiqc_report.html"
     params:
-        config=sequana_data("multiqc_config.yaml", "../multiqc")
-    run:
-        # we use a subprocess instead of using shell() to catch the
-        # recurrent errors due to matplotlib warning
-        # samtools multiqc module was buggy and not fitting our needs.
-        # bamtoools module was also not rendering properly. We implemented
-        # our own module within sequana.
-        modules = " -m sequana_bamtools_stats -m sequana_laa "
-        if do_kraken:
-            modules += " -m sequana_kraken "
-        if do_snpeff:
-            modules += " -m snpeff "
-        from subprocess import Popen
-        cmd = "multiqc . -f {} -c {}".format(modules, params.config)
-        process = Popen(cmd.split(), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-        process.wait()
+        options=config['multiqc']['options'],
+        input_directory=config['multiqc']['input_directory'],
+        config_file=config['multiqc']['config_file'],
+        modules=modules
+    log:
+        "multiqc/multiqc.log"
+    wrapper:
+       f"{sequana_wrapper_branch}/wrappers/multiqc"
 
 
 if do_kraken:
@@ -510,10 +572,10 @@ rule mafft:
         fasta="outputs/allfasta.fa"
     output:
         aln="outputs/mafft/mafft.aln.fa"
-    threads: 
+    threads:
         2
     container:
-        "https://zenodo.org/record/7031863/files/sequana_tools_0.14.2.img"
+        config['apptainers']['sequana_tools']
     shell:
         """
         mafft --thread {threads} --retree 1 --maxiterate 0 --add {input.fasta} \
@@ -535,7 +597,6 @@ rule raxml_mltree:
 
     This will generate 20 trees T1.RUN.X X=1..20 and one bestree.T1
 
-
     reference: https://cme.h-its.org/exelixis/web/software/raxml/hands_on.html
 
     """
@@ -550,7 +611,7 @@ rule raxml_mltree:
         options=config['raxml_mltree']['options'],
         wkdir=os.path.abspath("outputs/raxml")
     container:
-        "https://zenodo.org/record/7031863/files/sequana_tools_0.14.2.img"
+        config['apptainers']['raxml']
     shell:
         """
         # First, let us get a best likelihood tree from 20 ML trees
@@ -573,25 +634,26 @@ rule raxml_bootstrap:
     input:
         aln = "outputs/mafft/mafft.aln.fa"
     output:
-        tree = "outputs/raxml/RAxML_bootstrap.T2222",
-        #log = "outputs/raxml/raxml_bootstrap.log",
+        tree = "outputs/raxml/RAxML_bootstrap.T2222"
     threads: 4
     params:
         N=config['raxml_bootstrap']['N'],
-        options=config['raxml_bootstrap']['options']
-    run:
+        options=config['raxml_bootstrap']['options'],
+        wkdir=os.path.abspath("outputs/raxml")
+    container:
+        config['apptainers']['raxml']
+    log:
+        "outputs/raxml/raxml_bootstrap.log",
+    shell:
+        """
+        mkdir -p outputs/raxml
+        rm -f outputs/raxml/*T2222*
 
-        shell("mkdir -p outputs/raxml")
-        shell("rm -f outputs/raxml/*T2222*")
-
-        cmd = "raxmlHPC-PTHREADS -m GTRGAMMA -s {}".format(input.aln)
-        cmd += " -p 12345 "
-        cmd += " -b 12345 "
-        cmd += " -T {} ".format(threads)
-        cmd += " -w {}".format(os.path.abspath("outputs/raxml"))
-        cmd += " -N {}".format(params.N)
-        cmd += " -n T2222 " # 1>{}".format(output.log)
-        shell(cmd)
+        raxmlHPC-PTHREADS -m GTRGAMMA -s {input.aln}  -p 12345  -b 12345 -T {threads} \
+             -w {params.wkdir}  \
+             -N {params.N} \
+             -n T2222  1>{log}
+        """
 
 
 rule raxml_bipartitions:
@@ -607,22 +669,21 @@ rule raxml_bipartitions:
         best="outputs/raxml/RAxML_bestTree.T1111",
         boot="outputs/raxml/RAxML_bootstrap.T2222"
     output:
-        parti="outputs/raxml/RAxML_bipartitions.T3333",
-        #log = "outputs/raxml/raxml_partitions.log"
+        parti="outputs/raxml/RAxML_bipartitions.T3333"
+    params:
+        wkdir=os.path.abspath("outputs/raxml")
     threads: 1
-    run:
+    container:
+        config['apptainers']['raxml']
+    shell:
+        """
         # no need for threading
-        shell("mkdir -p outputs/raxml")
-        shell("rm -f outputs/raxml/*T3333*")
+        mkdir -p outputs/raxml
+        rm -f outputs/raxml/*T3333*
 
-        cmd = "raxmlHPC -m GTRCAT -f b "
-        cmd += " -p 12345 "
-        cmd += " -w {}".format(os.path.abspath("outputs/raxml"))
-        cmd += " -t {}".format(input.best)
-        cmd += " -z {}".format(input.boot)
-        cmd += " -n T3333 "  # 1>{} ".format(output.log)
+        raxmlHPC -m GTRCAT -f b -p 12345 -w {params.wkdir} -t {input.best} -z {input.boot} -n T3333
 
-        shell(cmd)
+        """
 
 if config['itol']['do']:
     rule itol:
@@ -670,35 +731,39 @@ rule mapping_consensus:
         sam = temp("outputs/mapping_consensus/mapping.sam")
     threads: 4
     log: "outputs/mapping_consensus/mapping.log"
+    container:
+        config["apptainers"]["sequana_tools"]
     shell:
         """
         minimap2 -x map-pb {input.reference} {input.consensus} -t {threads} -a 1> {output.sam} 2>{log}
-        bioconvert sam2bam {output.sam} {output.bam} --force
+        samtools view -Sbh -@ {threads} {output.sam} > {output.bam}
         bamtools sort -in {output.bam} -out {output.sorted_bam}
-        bamtools index -in {output.sorted_bam}
+        samtools index {output.sorted_bam}
         """
 
 
 rule remapping:
     """Remapp the consensus genomes onto the reference"""
 
-    input: 
+    input:
         reference="{sample}/consensus/consensus.fa",
         fastq=__mapping__input
-    output: 
+    output:
         sorted_bam = "{sample}/remapping/mapping.sorted.bam",
         sorted_bam_index = "{sample}/remapping/mapping.sorted.bam.bai",
         bam = temp("{sample}/remapping/mapping.bam"),
         sam = temp("{sample}/remapping/mapping.sam")
     threads: 4
-    log: "{sample}/mapping/mapping.log"
+    log:
+        "{sample}/mapping/mapping.log"
+    container:
+        config['apptainers']['sequana_tools']
     shell:
         """
-        #bamtools index -in {input.reference}
         minimap2 -x map-pb {input.reference} {input.fastq} -t {threads} -a 1> {output.sam} 2>{log}
-        bioconvert sam2bam {output.sam} {output.bam} --force
+        samtools view -Sbh -@ {threads} {output.sam} > {output.bam}
         bamtools sort -in {output.bam} -out {output.sorted_bam}
-        bamtools index -in {output.sorted_bam}
+        samtools index  {output.sorted_bam}
         """
 
 
@@ -782,14 +847,20 @@ if do_smrtlink_report:
 
 
 if do_snpeff:
-    localrules: copy_genbank, copy_reference, itol
+    if config['itol']['do']:
+        localrules: copy_genbank, copy_reference, itol
+    else:
+        localrules: copy_genbank, copy_reference
 else:
-    localrules: copy_reference, itol
+    if config['itol']['do']:
+        localrules: copy_reference, itol
+    else:
+        localrules: copy_reference
 
 
 onsuccess:
 
-    from sequana.modules_report.summary import SummaryModule
+    from sequana.modules_report.summary import SummaryModule2
     from sequana.modules_report.kraken import KrakenModule
 
     manager.teardown(extra_files_to_remove=['igv.log'])
@@ -945,11 +1016,12 @@ this <a href="multiqc_report.html">multiqc report.</a></p>
 
     intro = intro.format(len(manager.ff))
 
+    from sequana_pipelines import laa
     data = {"inputs":None, "outputs":None, "html":None, "snakefile": "laa.rules",
           "config": "config.yaml", "stats": "stats.txt", "rulegraph": ".sequana/rulegraph.svg",
-          "requirements": "inputs/requirements.txt"}
+          "requirements": "inputs/requirements.txt", "name": "laa", "pipeline_version": laa.version}
 
-    s = SummaryModule(data, intro=intro)
+    s = SummaryModule2(data, intro=intro)
 
     if do_kraken:
         from sequana.utils import config as conf
