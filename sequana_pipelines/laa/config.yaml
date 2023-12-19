@@ -1,18 +1,18 @@
-#input_pattern: "data/lima*.fastq"
-#input_pattern: "databam/*bam"
-#input_directory: "."
 
-input_directory: /home/cokelaer/Work/github/sequana_pipelines/sequana_laa/sequana_pipelines/laa/data
+sequana_wrappers: "v23.12.5"
+
+input_directory:
 input_pattern: '*fastq.gz'
-reference_file: 'AB038249.fa'
+reference_file:
+annotation_file:
 
 
 # if you have some samples starting with prefix to bed removed,
-# uncomment this line and fill the list 
+# uncomment this line and fill the list
 extra_prefixes_to_strip: ["lima_output"]
 
 # do not change:
-data_type_choice: "lima.ccs.fastq"   
+data_type_choice: "lima.ccs.fastq"
 
 #
 #
@@ -24,6 +24,10 @@ apptainers:
     graphviz: https://zenodo.org/record/7928262/files/graphviz_7.0.5.img
     raxml: https://zenodo.org/record/7968244/files/raxml_8.2.12.img
     sequana_tools: https://zenodo.org/record/7963917/files/sequana_tools_0.15.1.img
+    multiqc: https://zenodo.org/record/10205070/files/multiqc_1.16.0.img
+    ccs:  https://zenodo.org/record/7817325/files/ccs_6.4.0.img
+    laa: https://zenodo.org/record/10404979/files/pblaa_2.4.2.img
+    samtools: https://zenodo.org/record/7437898/files/samtools_1.16.1.img
 
 # for populations, and ploidy of 1, a population SNP found in a population
 # will have a score of 0. Here setting to 2 is a trick. Alternative is
@@ -49,8 +53,9 @@ freebayes:
 
 snpeff:
     do: false
-    annotation_file: AB038249.gbk
     options: -no-downstream -no-upstream
+    build_options: # -noCheckCds -noCheckProtein
+
 
 kraken:
     do: false

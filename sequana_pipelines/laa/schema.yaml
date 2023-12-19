@@ -4,13 +4,19 @@
 
 type: map
 mapping:
+    "sequana_wrappers":
+        type: str
+        required: true
     "input_directory":
         type: str
-        required: False
+        required: True
     "input_pattern":
         type: str
         required: False
     "reference_file":
+        type: str
+        required: True
+    "annotation_file":
         type: str
         required: True
     "data_type_choice":
@@ -42,9 +48,9 @@ mapping:
             "do":
                 type: bool
                 required: True
-            "annotation_file":
+            "build_options":
                 type: str
-                required: True
+                required: False
             "options":
                 type: str
                 required: True

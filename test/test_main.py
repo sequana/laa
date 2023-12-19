@@ -2,7 +2,9 @@ import os
 import subprocess
 import sys
 
-import sequana_pipelines.laa.main as m
+from sequana_pipelines.laa.main import main
+
+from click.testing import CliRunner
 
 from . import test_dir
 
@@ -16,9 +18,11 @@ def test_standalone_subprocess(tmpdir):
 
 def test_standalone_script(tmpdir):
     input_dir = os.sep.join((test_dir, 'data'))
-    sys.argv = ["test", "--input-directory", input_dir, "--working-directory", str(tmpdir), "--force",
-"--reference-file", ref_file]
-    m.main()
+    args = ["--input-directory", input_dir, "--working-directory", str(tmpdir), "--force", "--reference-file", ref_file]
+    runner = CliRunner()
+    results = runner.invoke(main, args)
+
+    assert results.exit_code == 0
 
 
 def test_version():

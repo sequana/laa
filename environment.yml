@@ -1,4 +1,4 @@
-name: sequana_variant_calling
+name: sequana_laa
 
 channels:
   - conda-forge

@@ -16,10 +16,6 @@ import subprocess
 import sequana
 from sequana_pipetools import snaketools as sm
 
-# for development when testing sequana-wrappers. DO NOT change
-sequana_wrapper_branch = "main"
-
-
 
 # ========================================================= The main config file
 #
@@ -75,9 +71,7 @@ expected_output = [
     ]
 
 if do_freebayes_vcf_filter:
-    expected_output.append(
-        expand("{sample}/report_variant/variant_calling.html", sample=manager.samples)
-    )
+    expected_output += expand("{sample}/report_variant/variant_calling.html", sample=manager.samples)
 
 if config['itol']['do']:
     __phylogeny__output = "outputs/dendogram.png"
@@ -87,15 +81,15 @@ if config['itol']['do']:
 # Do kraken analysis ?
 if do_kraken:
    expected_output.append("images/proportion_kraken.png")
+   expected_output += expand("{sample}/taxonomy/summary.html", sample=manager.samples)
 
 
 if do_snpeff:
-    assert config['snpeff']['reference_file'].endswith('.gbk'), "genbank must end in .gbk"
+    assert config['annotation_file'] and config["annotation_file"].endswith('.gbk'), "genbank must end in .gbk"
 
-    __copy_genbank__input = config['snpeff']['reference_file']
-    __copy_genbank__output = "reference/" + os.path.basename(__copy_genbank__input)
+    __copy_genbank__output = "reference/" + os.path.basename(config['annotation_file'])
     rule copy_genbank:
-        input: __copy_genbank__input
+        input: config["annotation_file"]
         output: __copy_genbank__output
         shell:
             """cp {input} {output}"""
@@ -104,10 +98,7 @@ if do_snpeff:
 
 # MUST BE ONE OF THE FIRST RULE ?
 rule pipeline:
-    input:  expected_output
-
-
-__rawdata__input = manager.getrawdata()
+    input: expected_output
 
 
 laa = False
@@ -120,10 +111,12 @@ if laa is True:
         params:
             directory="bc{sample}"
         threads: 2
+        container:
+            config["apptainers"]["laa"]
         shell:
             """
             cd {params.directory}
-            laa --noPhasing --minLength 1000 -v --maxReads 2400  --numThreads={threads} {input}
+            laa --noPhasing --minLength 1000 --maxReads 2400  --numThreads={threads} {input}
             """
 
 
@@ -139,33 +132,38 @@ if bam2ccs:
             config['apptainers']['ccs']
         shell:
             """
-            #mkdir -p {params.directory}
-            #cd {params.directory}
             ccs {input} {output} --numThreads {threads}
             """
 
-
-# __mapping__input is made of a set of FASTQ
 
 if ccs2fastq:
     rule ccs2fastq:
         input: manager.getrawdata()
         output: "fastq/{sample}/data.fastq"
         container:
-            config['apptainers']['sequana_tools']
+            config['apptainers']['samtools']
         shell:
             """
             samtools fastq {input} > {output}
             """
-    __mapping__input = "fastq/{sample}/data.fastq"
-    __sequana_kraken__input = "fastq/{sample}/data.fastq"
-else:
-    __mapping__input = manager.getrawdata()
-    __sequana_kraken__input = manager.getrawdata()
+
+
+def get_input_fastq(wildcards):
+    if ccs2fastq:
+        return "fastq/{wildcards.sample}/data.fastq"
+    else:
+        return manager.samples[wildcards.sample]
+
+
+def get_input_kraken(wildcards):
+    if ccs2fastq:
+        return "fastq/{wildcards.sample}/data.fastq"
+    else:
+        return manager.samples[wildcards.sample]
 
 
 rule fastq_stats:
-    input: __mapping__input
+    input: get_input_fastq
     output: "{sample}/sequana_laa_{sample}.json"
     run:
         import json
@@ -177,39 +175,45 @@ rule fastq_stats:
             json.dump(data, fout, indent=True, sort_keys=True)
 
 
+reference_file  = config["reference_file"]
+annotation_file = config["annotation_file"]
+new_reference = f"reference/{os.path.basename(reference_file)}"
 
-if do_snpeff:
-    __snpeff_add_locus_in_fasta__input_fasta = reference
+
+# ========================================================= snpeff
+# Add locus in FASTA file for snpEff
+if config["snpeff"]["do"]:
+    #__snpeff_add_locus_in_fasta__input_fasta = reference
     new_reference = "reference/{0}".format(os.path.basename(reference))
 
     rule snpeff_add_locus_in_fasta:
         input:
             config["reference_file"],
-            config["snpeff"]["annotation_file"]
+            config["annotation_file"]
         output:
             new_reference
         params:
             options=config["snpeff"]["build_options"]
         log:
-            "common_logs/snpeff_add_locus_in_fasta.log"
+            "logs/snpeff_add_locus_in_fasta.log"
         container:
             config['apptainers']['sequana_tools']
         wrapper:
-            f"{sequana_wrapper_branch}/wrappers/snpeff_add_locus_in_fasta"
-
+            f"{manager.wrappers}/wrappers/snpeff_add_locus_in_fasta"
     reference = new_reference
-else:
-    # copy reference into ./reference
-    __copy_reference__input = config['reference_file']
-    __copy_reference__output = "reference/" + os.path.basename(__copy_reference__input)
-
+# Copy the reference index if it exists
+elif not os.path.isfile(reference_file + ".fai"):
     rule copy_reference:
-        input: __copy_reference__input
-        output: __copy_reference__output
+        input:
+            src=reference_file
+        output:
+            src=new_reference
         shell:
-            """cp {input} {output}"""
-    expected_output.append(__copy_reference__output)
-    reference = __copy_reference__output
+            """
+            cp {input.src} {output.src}
+            """
+else:
+    new_reference = reference_file
 
 
 
@@ -219,7 +223,7 @@ rule mapping:
     # a dictionary with {sample} wildcards, otherwise a simple wildcard, which
     # is the output of ccs2fastq rule
     input:
-        fastq=__mapping__input,
+        fastq=get_input_fastq,
         reference=reference
     output:
         sorted_bam = "{sample}/mapping/mapping.sorted.bam",
@@ -245,7 +249,7 @@ rule samtools_stats:
     input: "{sample}/mapping/mapping.sorted.bam"
     output: "{sample}/mapping/samtools_{sample}.txt"
     container:
-        config['apptainers']['sequana_tools']
+        config['apptainers']['samtools']
     shell:
         "samtools stats -in {input} > {output}"
 
@@ -287,7 +291,7 @@ if do_freebayes:
         container:
             config['apptainers']['sequana_tools']
         wrapper:
-            f"{sequana_wrapper_branch}/wrappers/freebayes"
+            f"{manager.wrappers}/wrappers/freebayes"
 
 if do_split_multiallelic:
 
@@ -331,7 +335,7 @@ if do_freebayes and do_snpeff:
         container:
             config['apptainers']['sequana_tools']
         wrapper:
-            f"{sequana_wrapper_branch}/wrappers/snpeff"
+            f"{manager.wrappers}/wrappers/snpeff"
 
     __freebayes_vcf_filter__input = "{sample}/snpeff/{sample}.ann.vcf"
 elif do_freebayes:
@@ -357,7 +361,7 @@ if do_freebayes and do_freebayes_vcf_filter:
         container:
             config['apptainers']['sequana_tools']
         wrapper:
-            f"{sequana_wrapper_branch}/wrappers/freebayes_vcf_filter"
+            f"{manager.wrappers}/wrappers/freebayes_vcf_filter"
 
 
 rule igv_bases:
@@ -425,7 +429,7 @@ rule rulegraph:
         mapper = {"multiqc": "../multiqc/multiqc_report.html"},
         configname = "config.yaml"
     wrapper:
-        f"{sequana_wrapper_branch}/wrappers/rulegraph"
+        f"{manager.wrappers}/wrappers/rulegraph"
 
 
 rule dot2svg:
@@ -472,19 +476,23 @@ rule multiqc:
         modules=modules
     log:
         "multiqc/multiqc.log"
+    container:
+        config["apptainers"]["multiqc"]
     wrapper:
-       f"{sequana_wrapper_branch}/wrappers/multiqc"
+       f"{manager.wrappers}/wrappers/multiqc"
 
 
 if do_kraken:
     rule create_proportion_plot_kraken:
-        input: expand("{sample}/taxonomy/kraken/kraken.csv", sample=sorted(samples))
+        input: expand("{sample}/taxonomy/kraken/kraken.csv", sample=sorted(manager.samples))
         output:
             image="images/proportion_kraken.png",
             data="outputs/sequana_kraken_summary.json"
         run:
-            from sequana.kraken import MultiKrakenResults
-            k = MultiKrakenResults(input, sample_names=sorted(samples))
+            import json
+            from sequana.kraken.multikraken import MultiKrakenResults
+
+            k = MultiKrakenResults(input, sample_names=sorted(manager.samples))
             fontsize = 12
             if len(input) > 30:
                 fontsize = 10
@@ -492,7 +500,6 @@ if do_kraken:
                 fontsize = 8
             k.plot_stacked_hist(output.image, dpi=200, ytick_fontsize=fontsize)
 
-            import json
             with open(output.data, "w") as fout:
                 json.dump(k.get_df().to_dict(), fout, indent=True, sort_keys=True)
 
@@ -747,7 +754,7 @@ rule remapping:
 
     input:
         reference="{sample}/consensus/consensus.fa",
-        fastq=__mapping__input
+        fastq=get_input_fastq
     output:
         sorted_bam = "{sample}/remapping/mapping.sorted.bam",
         sorted_bam_index = "{sample}/remapping/mapping.sorted.bam.bai",
@@ -776,7 +783,7 @@ rule build_fasta:
 if do_kraken:
     rule sequana_kraken:
         #input: lambda wildcards: manager.samples[wildcards.sample]
-        input: __sequana_kraken__input
+        input: get_input_fastq
         output:
             html="{sample}/taxonomy/summary.html",
             csv= "{sample}/taxonomy/kraken/kraken.csv"
@@ -792,6 +799,7 @@ if do_kraken:
                 assert os.path.exists(this), "databases {} does not exits".format(this)
                 cmd += " {} ".format(this)
             shell(cmd)
+    html="{sample}/taxonomy/summary.html",
 
 
 rule plot_ccs_histo:
@@ -860,15 +868,15 @@ else:
 
 onsuccess:
 
-    from sequana.modules_report.summary import SummaryModule2
+    from sequana.modules_report.summary import SequanaReport
     from sequana.modules_report.kraken import KrakenModule
 
     manager.teardown(extra_files_to_remove=['igv.log'])
 
     intro = """
-      <h2>Amplicon Analysis Summary.</h2> <br>
+      <h2>Long Read Amplicon Analysis Summary.</h2> <br>
       <br><b>Number of samples:</b> {} </br>
-      <b> MultiQC report: </b> <a href="multiqc_report.html">multiqc report.</a> This multiqc report contains comparative analysis for the different analysis performed by the pipeline including the snpeff, raw reads information (e.g. number of CCS reads in each barcode), taxonomic analysis, variant calling (using freebayes) and some mapping statistics. 
+      <b> MultiQC report: </b> <a href="multiqc/multiqc_report.html">multiqc report.</a> This multiqc report contains comparative analysis for the different analysis performed by the pipeline including the snpeff, raw reads information (e.g. number of CCS reads in each barcode), taxonomic analysis, variant calling (using freebayes) and some mapping statistics. 
 
 Here below you can find all individual links to HTML reports for each sample for snpeff, kraken and freebayes analysis.
 
@@ -953,7 +961,7 @@ The common directory contains final results or files required to redo the analys
 
 
 <p>
- ├── <a href="./multiqc_report.html">multiqc_report.html</a><br>
+ ├── <a href="./multiqc/multiqc_report.html">multiqc_report.html</a><br>
  ├── <a href="./outputs/">outputs</a><br>
  │   ├── <a href="./outputs/allfasta.fa">allfasta.fa</a><br>
  │   ├── <a href="./outputs/dendogram.png">dendogram</a><br>
@@ -1006,32 +1014,33 @@ this <a href="multiqc_report.html">multiqc report.</a></p>
     else:
         intro +="""<p>No SNPEFF report available (was not required). Please see variant reports instead</p></div>"""
 
-    intro += "<div><h2>Variant reports</h2>"
+    intro += "<h2>Variant reports</h2>"
     for sample in sorted(manager.samples):
         intro += """<a href="{}/report_variant/variant_calling.html">{}/variant report</a><br>""".format(sample, sample)
 
-    try:intro += "<div><h2>Phylogeny</h2><img src={}></img></div>".format(__phylogeny__output)
+    try:intro += "<h2>Phylogeny</h2><div><img src={}></img></div>".format(__phylogeny__output)
     except NameError:pass
 
 
     intro = intro.format(len(manager.ff))
 
-    from sequana_pipelines import laa
-    data = {"inputs":None, "outputs":None, "html":None, "snakefile": "laa.rules",
-          "config": "config.yaml", "stats": "stats.txt", "rulegraph": ".sequana/rulegraph.svg",
-          "requirements": "inputs/requirements.txt", "name": "laa", "pipeline_version": laa.version}
 
-    s = SummaryModule2(data, intro=intro)
+    data = manager.getmetadata()
+
+    s = SequanaReport(data, intro=intro)
 
     if do_kraken:
         from sequana.utils import config as conf
+        from pathlib import Path
+        import json
+
         for sample in sorted(manager.samples):
             sample_summary = {}
 
             conf.summary_sections = []
             conf.output_dir = "{}".format(sample)
 
-            k = KrakenModule( sample + "/taxonomy/kraken")
+            k = KrakenModule( Path(sample) / "taxonomy"  / "kraken")
             sample_summary['kraken_json'] = json.loads(k._get_stats().to_json())
             conf.summary_sections.append({
                 "name": "Kraken ",
@@ -1044,7 +1053,5 @@ this <a href="multiqc_report.html">multiqc report.</a></p>
     shell("rm -rf rulegraph")
 
 onerror:
-    from sequana_pipetools.errors import PipeError
-    p = PipeError("laa")
-    p.status()
+    manager.onerror()
 
