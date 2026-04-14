@@ -589,7 +589,7 @@ rule consensus:
     params:
         min_depth = 10
     run:
-        from sequana.laa import Consensus
+        from sequana_pipelines.laa.consensus import Consensus
         c = Consensus(input.bases, input.freebayes)
         c.min_depth = params.min_depth
 
