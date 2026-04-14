@@ -13,12 +13,9 @@
 import sys
 import os
 
-import click_completion
 import rich_click as click
 from sequana_pipetools import SequanaManager
 from sequana_pipetools.options import *
-
-click_completion.init()
 
 NAME = "laa"
 

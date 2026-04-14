@@ -1,6 +1,4 @@
 
-sequana_wrappers: "v23.12.5"
-
 input_directory:
 input_pattern: '*fastq.gz'
 reference_file:
@@ -23,11 +21,12 @@ data_type_choice: "lima.ccs.fastq"
 apptainers:
     graphviz: https://zenodo.org/record/7928262/files/graphviz_7.0.5.img
     raxml: https://zenodo.org/record/7968244/files/raxml_8.2.12.img
-    sequana_tools: https://zenodo.org/record/7963917/files/sequana_tools_0.15.1.img
+    sequana_tools: https://zenodo.org/record/18257162/files/sequana_tools_26.1.14.img
     multiqc: https://zenodo.org/record/10205070/files/multiqc_1.16.0.img
     ccs:  https://zenodo.org/record/7817325/files/ccs_6.4.0.img
     laa: https://zenodo.org/record/10404979/files/pblaa_2.4.2.img
     samtools: https://zenodo.org/record/7437898/files/samtools_1.16.1.img
+    igvtools: https://zenodo.org/record/7022635/files/igvtools_2.12.0.img
 
 # for populations, and ploidy of 1, a population SNP found in a population
 # will have a score of 0. Here setting to 2 is a trick. Alternative is
