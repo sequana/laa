@@ -9,6 +9,10 @@
 .. image:: https://github.com/sequana/laa/actions/workflows/main.yml/badge.svg
    :target: https://github.com/sequana/laa/actions/workflows/main.yml)
 
+.. image:: https://img.shields.io/badge/python-3.11%20%7C%203.12-blue.svg
+    :target: https://pypi.python.org/pypi/sequana_laa
+    :alt: Python 3.11 | 3.12
+
 
 
 This is is the **laa** pipeline from the `Sequana <https://sequana.readthedocs.org>`_ project
@@ -23,7 +27,7 @@ This pipeline was used in :
 
 - L'Honneur et al (polyomavirus, 2022) https://pubmed.ncbi.nlm.nih.gov/34979561/ 
 - Kali et al (rabies,2021), https://pubmed.ncbi.nlm.nih.gov/33444703/
-- Claireaux et al. (gene involved in HIV, 2022) accepted, not yet on pubmed
+- Claireaux et al. (gene involved in HIV, 2022) https://pubmed.ncbi.nlm.nih.gov/35082297/
 
 Installation
 ~~~~~~~~~~~~
@@ -49,14 +53,9 @@ This creates a directory with the pipeline and configuration file. You will then
 to execute the pipeline::
 
     cd laa
-    sh laa.sh  # for a local run
+    bash laa.sh  # for a local run
 
-This launch a snakemake pipeline. If you are familiar with snakemake, you can 
-retrieve the pipeline itself and its configuration files and then execute the pipeline yourself with specific parameters::
-
-    snakemake -s laa.rules -c config.yaml --cores 4 --stats stats.txt --wrapper-prefix git+file:///home/cokelaer/Work/github/forked/sequana-wrappers
-
-Or use `sequanix <https://sequana.readthedocs.io/en/main/sequanix.html>`_ interface.
+This launches a snakemake pipeline.
 
 Requirements
 ~~~~~~~~~~~~
@@ -93,6 +92,12 @@ Changelog
 ========= ====================================================================
 Version   Description
 ========= ====================================================================
+0.12.0    * migrated to modern sequana layout (poetry, rich_click, no
+            click_completion); wrapper: directives replaced by
+            manager.get_shell shells or inline shell/run blocks;
+            dedicated igvtools apptainer; samtools faidx rule to build
+            the reference index
+0.11.0    add apptainer containers
 0.10.0    full integration with latest wrapeprs and apptainers from damona
 0.9.0     add singularity containers
 0.8.0     **First release.**

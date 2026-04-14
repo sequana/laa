@@ -1,22 +1,18 @@
 name: sequana_laa
-
 channels:
-  - conda-forge
-  - bioconda
-  - defaults
-
+- conda-forge
+- bioconda
+- defaults
 dependencies:
-  - freebayes>1
-  - bwa
-  - 'snpeff==5.1d'
-  - sambamba
-  - samtools>=1.15
-  - bamtools
-  - igvtools
-  - vt
-  - bcftools
-  - pip
-  - pip:
-    - sequana
-
-
+- freebayes>1
+- bwa
+- snpeff==5.1d
+- sambamba
+- samtools>=1.15
+- bamtools
+- igvtools
+- vt
+- bcftools
+- pulp>=2.8
+- pip:
+  - sequana
