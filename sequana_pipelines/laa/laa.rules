@@ -1076,7 +1076,7 @@ this <a href="multiqc_report.html">multiqc report.</a></p>
             sample_summary['kraken_json'] = json.loads(k._get_stats().to_json())
             conf.summary_sections.append({
                 "name": "Kraken ",
-                "anchor'": "kraken",
+                "anchor": "kraken",
                 "content": k._get_summary_section()
             })
 
